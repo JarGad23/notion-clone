@@ -226,3 +226,70 @@ export const getSearch = query({
     return documents;
   },
 });
+
+export const getById = query({
+  args: { documentId: v.id("documents") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    const docuemnt = await ctx.db.get(args.documentId);
+
+    if (!docuemnt) {
+      throw new Error("Not found");
+    }
+
+    if (docuemnt.isPublished && !docuemnt.isArchived) {
+      return docuemnt;
+    }
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const userId = identity.subject;
+
+    if (docuemnt.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    return docuemnt;
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("documents"),
+    title: v.optional(v.string()),
+    content: v.optional(v.string()),
+    coverImage: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    isPublished: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const userId = identity.subject;
+
+    const { id, ...rest } = args;
+
+    const exisitingDocument = await ctx.db.get(args.id);
+
+    if (!exisitingDocument) {
+      throw new Error("Document not found");
+    }
+
+    if (exisitingDocument.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    const document = await ctx.db.patch(args.id, {
+      ...rest,
+    });
+
+    return document;
+  },
+});
